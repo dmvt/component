@@ -42,12 +42,13 @@ defmodule Component.Builder do
   @doc false
   defmacro __using__(opts) do
     quote do
-      @behaviour Component
+      use Component
+
       @component_builder_opts unquote(opts)
 
       def call(conn, opts), do: component_builder_call(conn, opts)
 
-      defoverridable [call: 2, respond: 2]
+      defoverridable [call: 2]
 
       import Component.Builder, only: [component: 1, component: 2]
 
@@ -112,13 +113,13 @@ defmodule Component.Builder do
     pipeline = Enum.map(pipeline, &init_component(&1))
 
     compiled_pipeline = Enum.reduce(
-      pipeline,
+      Enum.reverse(pipeline),
       conn,
       &quote_component_calls(&1, &2, env, builder_opts)
     )
 
     compiled_pipeline = Enum.reduce(
-      Enum.reverse(pipeline),
+      pipeline,
       compiled_pipeline,
       &quote_component_responds(&1, &2, env, builder_opts)
     )
@@ -127,6 +128,7 @@ defmodule Component.Builder do
   end
 
   # private
+
   defp compile_guards(call, true) do
     call
   end
@@ -158,13 +160,13 @@ defmodule Component.Builder do
     initialized_opts = component.init(opts)
 
     Enum.each([:call, :respond], fn(fun) ->
-      if function_exported?(component, fun, 2) do
-        {:module, component, initialized_opts, guards}
-      else
+      if !function_exported?(component, fun, 2) do
         raise ArgumentError,
           message: "#{inspect component} component must implement #{fun}/2"
       end
     end)
+
+    {:module, component, initialized_opts, guards}
   end
 
   defp quote_component_call(:function, component, opts) do
@@ -202,24 +204,14 @@ defmodule Component.Builder do
   ) do
     call =
       quote do
-        unquote(component).responds(conn, unquote(Macro.escape(opts)))
+        unquote(component).respond(conn, unquote(Macro.escape(opts)))
       end
 
     wrap_existing_ast(call, guards, acc)
   end
 
   defp wrap_existing_ast(call, guards, acc) do
-    {fun, meta, [arg, [do: clauses]]} =
-      quote do
-        unquote(compile_guards(call, guards))
-        unquote(acc)
-      end
-
-    clauses =
-      Enum.map(clauses, fn {:->, meta, args} ->
-        {:->, [generated: true] ++ meta, args}
-      end)
-
-    {fun, meta, [arg, [do: clauses]]}
+    {fun, meta, [_arg1, opts]} = quote do: unquote(compile_guards(call, guards))
+    {fun, [generated: true] ++ meta, [acc, opts]}
   end
 end

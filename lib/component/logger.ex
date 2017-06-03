@@ -36,6 +36,6 @@ defmodule Component.Logger do
   # private
 
   defp conn_to_log(conn) do
-    [DateTime.utc_now, ":", ?\s, inspect(conn)]
+    [to_string(DateTime.utc_now), ":", ?\s, inspect(conn)]
   end
 end
