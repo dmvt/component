@@ -26,16 +26,22 @@ defmodule Component.Logger do
 
   @doc false
   def call(conn, level) do
-    Logger.log(level, conn_to_log(conn))
+    Logger.log(level, conn_to_log(conn, :call))
     conn
   end
 
   @doc false
-  def respond(conn, opts), do: call(conn, opts)
+  def respond(conn, level) do
+    Logger.log(level, conn_to_log(conn, :respond))
+    conn
+  end
 
   # private
 
-  defp conn_to_log(conn) do
-    [to_string(DateTime.utc_now), ":", ?\s, inspect(conn)]
+  defp conn_to_log(conn, function_name) do
+    ["Component.Logger.#{function_name} at ",
+     to_string(DateTime.utc_now),
+     ": ",
+     inspect(conn)]
   end
 end
